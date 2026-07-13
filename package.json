@@ -1,0 +1,18 @@
+{
+  "name": "capsule",
+  "version": "1.0.0",
+  "description": "A Chrome extension to capture an entire conversation from one AI chat tab and inject it into a different AI's chat window.",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  },
+  "dependencies": {
+    "jsdom": "^29.1.1"
+  }
+}
