@@ -265,7 +265,7 @@ Capsule/
 │   └── .env.example              #   Environment variable template
 │
 ├── assets/
-│   ├── banner.png                #   README banner
+│   ├── banner.jpg                #   README banner
 │   ├── icon{16,48,128}.png       #   Extension icons
 │   └── fonts/                    #   Space Grotesk, JetBrains Mono
 │
