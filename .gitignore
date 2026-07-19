@@ -13,6 +13,12 @@ test-fixtures/live-results/
 test_output.txt
 test_results.txt
 
+# Backend
+backend/node_modules/
+backend/package-lock.json
+backend/.env
+backend/capsule.db
+
 # OS files
 .DS_Store
 Thumbs.db

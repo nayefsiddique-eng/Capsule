@@ -1,11 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const BACKEND_URL = 'http://localhost:3001';
+
   // --- Auth View Elements ---
   const authView = document.getElementById('auth-view');
   const mainView = document.getElementById('main-view');
   const settingsView = document.getElementById('settings-view');
+  const otpView = document.getElementById('otp-view'); // Added by HTML rewrite
+  const forgotView = document.getElementById('forgot-view');
   
   const authMainForms = document.getElementById('auth-main-forms');
-  const forgotView = document.getElementById('forgot-view');
   const forgotLink = document.getElementById('forgot-password-link');
   const backToSignin = document.getElementById('back-to-signin');
   const forgotForm = document.getElementById('forgot-form');
@@ -31,12 +34,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const signinOnlyElements = document.querySelectorAll('.signin-only');
   
   const eyeToggle = document.querySelector('.eye-toggle');
-  
   const strengthFill = document.getElementById('strength-fill');
   const strengthText = document.getElementById('strength-text');
   
   const skipAuthBtn = document.getElementById('skip-auth');
   const userAvatar = document.getElementById('user-avatar');
+
+  // Inline Auth Error Element (Added in HTML rewrite)
+  const authError = document.getElementById('auth-error');
+
+  // --- OTP Elements (Added in HTML rewrite) ---
+  const otpInputs = document.querySelectorAll('.otp-digit');
+  const otpEmailDisplay = document.getElementById('otp-email-display');
+  const otpResendBtn = document.getElementById('otp-resend');
+  const otpTimerDisplay = document.getElementById('otp-countdown');
+  const backToSignupBtn = document.getElementById('otp-back');
+  let currentOtpEmail = '';
+  let otpTimerInterval = null;
 
   // --- Settings View Elements ---
   const settingsBtn = document.getElementById('settings-btn');
@@ -56,18 +70,29 @@ document.addEventListener('DOMContentLoaded', () => {
   let pendingAction = null; // 'merge' or 'diff'
   let actionSourceId = null;
 
-  // --- Auth Logic ---
-  
-  function checkSession() {
-    chrome.storage.local.get(['session'], (result) => {
-      if (result.session) {
-        // If session was not persistent, clear it on start
-        if (result.session.persistent === false) {
-          chrome.storage.local.remove('session', () => {
-            showAuthView();
+  // --- AUTH LOGIC (JWT + BACKEND) ---
+
+  async function checkSession() {
+    chrome.storage.local.get(['sessionToken', 'guestMode'], async (result) => {
+      if (result.guestMode) {
+        showMainView({ name: 'Guest' });
+        return;
+      }
+
+      if (result.sessionToken) {
+        try {
+          const res = await fetch(`${BACKEND_URL}/auth/me`, {
+            headers: { 'Authorization': `Bearer ${result.sessionToken}` }
           });
-        } else {
-          showMainView(result.session);
+          if (res.ok) {
+            const data = await res.json();
+            showMainView(data.user);
+          } else {
+            chrome.storage.local.remove('sessionToken', () => showAuthView());
+          }
+        } catch (err) {
+          console.error('Auth verification failed:', err);
+          showAuthView();
         }
       } else {
         showAuthView();
@@ -79,15 +104,18 @@ document.addEventListener('DOMContentLoaded', () => {
     authView.style.display = 'flex';
     mainView.style.display = 'none';
     settingsView.style.display = 'none';
+    if (otpView) otpView.style.display = 'none';
   }
   
-  function showMainView(session) {
+  function showMainView(user) {
     authView.style.display = 'none';
     mainView.style.display = 'flex';
     settingsView.style.display = 'none';
-    if (session && session.name) {
-      userAvatar.textContent = session.name.charAt(0).toUpperCase();
-      userAvatar.title = "Sign Out (" + session.name + ")";
+    if (otpView) otpView.style.display = 'none';
+    
+    if (user && user.name) {
+      userAvatar.textContent = user.name.charAt(0).toUpperCase();
+      userAvatar.title = "Sign Out (" + user.name + ")";
     } else {
       userAvatar.textContent = "U";
       userAvatar.title = "Sign Out";
@@ -95,7 +123,20 @@ document.addEventListener('DOMContentLoaded', () => {
     render();
   }
 
-  // Forgot password routing
+  function showInlineError(msg) {
+    if (authError) {
+      authError.textContent = msg;
+      authError.style.display = 'block';
+    } else {
+      alert(msg);
+    }
+  }
+
+  function hideInlineError() {
+    if (authError) authError.style.display = 'none';
+  }
+
+  // --- FORGOT PASSWORD ---
   forgotLink.addEventListener('click', (e) => {
     e.preventDefault();
     authMainForms.style.display = 'none';
@@ -110,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     forgotEmail.value = '';
   });
 
-  forgotForm.addEventListener('submit', (e) => {
+  forgotForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!forgotEmail.value.includes('@')) {
       showError(forgotEmail);
@@ -123,16 +164,37 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtnText.style.display = 'none';
     submitSpinner.style.display = 'block';
     
-    setTimeout(() => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.value })
+      });
+      const data = await res.json();
+      
       submitBtnText.style.display = 'block';
       submitSpinner.style.display = 'none';
-      forgotStatus.style.display = 'block';
-    }, 800);
+
+      if (res.ok) {
+        forgotStatus.style.display = 'block';
+        forgotStatus.textContent = data.message;
+        setTimeout(() => {
+          showOTPView(forgotEmail.value);
+        }, 1500);
+      } else {
+        alert(data.error || 'Failed to send reset link');
+      }
+    } catch (err) {
+      submitBtnText.style.display = 'block';
+      submitSpinner.style.display = 'none';
+      alert('Network error. Is the backend running?');
+    }
   });
 
-  // Switch tabs
+  // --- TABS ---
   function switchTab(tab) {
     currentTab = tab;
+    hideInlineError();
     if (tab === 'signin') {
       tabSignin.classList.add('active');
       tabSignup.classList.remove('active');
@@ -159,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
   tabSignin.addEventListener('click', () => switchTab('signin'));
   tabSignup.addEventListener('click', () => switchTab('signup'));
 
-  // Eye toggle
+  // --- EYE TOGGLE ---
   eyeToggle.addEventListener('click', () => {
     if (passwordInput.type === 'password') {
       passwordInput.type = 'text';
@@ -179,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Password strength
+  // --- PASSWORD STRENGTH ---
   passwordInput.addEventListener('input', (e) => {
     if (currentTab !== 'signup') return;
     const val = e.target.value;
@@ -206,13 +268,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Form submission
-  form.addEventListener('submit', (e) => {
+  // --- FORM SUBMISSION ---
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    hideInlineError();
     
     let isValid = true;
     
-    // Basic validation
     if (!emailInput.value.includes('@')) {
       showError(emailInput);
       isValid = false;
@@ -221,7 +283,6 @@ document.addEventListener('DOMContentLoaded', () => {
       showError(passwordInput);
       isValid = false;
     }
-    
     if (currentTab === 'signup') {
       if (nameInput.value.trim() === '') {
         showError(nameInput);
@@ -237,61 +298,210 @@ document.addEventListener('DOMContentLoaded', () => {
     
     btnText.style.display = 'none';
     spinner.style.display = 'block';
-    
-    setTimeout(() => {
+
+    try {
+      if (currentTab === 'signup') {
+        const res = await fetch(`${BACKEND_URL}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: nameInput.value.trim(),
+            email: emailInput.value.trim(),
+            password: passwordInput.value
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showOTPView(emailInput.value.trim());
+        } else {
+          showInlineError(data.error || 'Registration failed');
+        }
+      } else {
+        const res = await fetch(`${BACKEND_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: emailInput.value.trim(),
+            password: passwordInput.value
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          chrome.storage.local.set({ sessionToken: data.token, guestMode: false }, () => {
+            showMainView(data.user);
+          });
+        } else {
+          if (data.error && data.error.includes('verified')) {
+            // Re-send OTP if unverified
+            await fetch(`${BACKEND_URL}/auth/send-otp`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: emailInput.value.trim() })
+            });
+            showOTPView(emailInput.value.trim());
+          } else {
+            showInlineError(data.error || 'Login failed');
+          }
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      showInlineError('Network error. Is the backend server running?');
+    } finally {
       btnText.style.display = 'block';
       spinner.style.display = 'none';
-      
-      const session = {
-        name: currentTab === 'signup' ? nameInput.value : emailInput.value.split('@')[0],
-        email: emailInput.value,
-        persistent: rememberInput.checked
-      };
-      
-      if (currentTab === 'signup') {
-        const authCard = document.querySelector('.auth-card');
-        authCard.classList.add('success-burst');
-        setTimeout(() => {
-          authCard.classList.remove('success-burst');
-          chrome.storage.local.set({ session }, () => showMainView(session));
-        }, 300);
-      } else {
-        chrome.storage.local.set({ session }, () => showMainView(session));
-      }
-    }, 800);
+    }
   });
   
   function showError(inputEl) {
     inputEl.classList.remove('shake');
-    void inputEl.offsetWidth; // trigger reflow
+    void inputEl.offsetWidth;
     inputEl.classList.add('error', 'shake');
     setTimeout(() => inputEl.classList.remove('shake'), 400);
   }
   
-  // Clear error on input
   [emailInput, passwordInput, confirmInput, nameInput, forgotEmail].forEach(el => {
     if(el) el.addEventListener('input', () => el.classList.remove('error'));
   });
 
-  // Skip auth
+  // --- OTP VIEW LOGIC ---
+  function showOTPView(email) {
+    if (!otpView) return;
+    currentOtpEmail = email;
+    if (otpEmailDisplay) otpEmailDisplay.textContent = email;
+    authView.style.display = 'none';
+    forgotView.style.display = 'none';
+    otpView.style.display = 'flex';
+    
+    // Reset inputs
+    otpInputs.forEach(i => i.value = '');
+    if (otpInputs.length > 0) otpInputs[0].focus();
+    
+    startOTPTimer();
+  }
+
+  function startOTPTimer() {
+    clearInterval(otpTimerInterval);
+    let seconds = 300; // 5 mins
+    otpResendBtn.style.pointerEvents = 'none';
+    otpResendBtn.style.opacity = '0.5';
+    
+    otpTimerInterval = setInterval(() => {
+      seconds--;
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      if (otpTimerDisplay) {
+        otpTimerDisplay.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+      }
+      
+      if (seconds <= 0) {
+        clearInterval(otpTimerInterval);
+        if (otpTimerDisplay) otpTimerDisplay.textContent = '0:00';
+        otpResendBtn.style.pointerEvents = 'auto';
+        otpResendBtn.style.opacity = '1';
+      }
+    }, 1000);
+  }
+
+  if (otpInputs) {
+    otpInputs.forEach((input, i) => {
+      input.addEventListener('input', (e) => {
+        if (e.target.value.length === 1 && i < otpInputs.length - 1) {
+          otpInputs[i + 1].focus();
+        }
+        checkOTPSubmit();
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !e.target.value && i > 0) {
+          otpInputs[i - 1].focus();
+        }
+      });
+      input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+        [...pasted].forEach((char, index) => {
+          if (otpInputs[index]) {
+            otpInputs[index].value = char;
+            if (index < otpInputs.length - 1) otpInputs[index + 1].focus();
+          }
+        });
+        checkOTPSubmit();
+      });
+    });
+  }
+
+  async function checkOTPSubmit() {
+    const code = Array.from(otpInputs).map(i => i.value).join('');
+    if (code.length === 6) {
+      // Auto submit
+      otpInputs.forEach(i => i.disabled = true);
+      try {
+        const res = await fetch(`${BACKEND_URL}/auth/verify-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: currentOtpEmail, otp: code })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          chrome.storage.local.set({ sessionToken: data.token, guestMode: false }, () => {
+            showMainView(data.user);
+          });
+        } else {
+          alert(data.error || 'Invalid code');
+          otpInputs.forEach(i => i.disabled = false);
+          otpInputs.forEach(i => i.value = '');
+          otpInputs[0].focus();
+        }
+      } catch (err) {
+        alert('Network error verifying OTP');
+        otpInputs.forEach(i => i.disabled = false);
+      }
+    }
+  }
+
+  if (otpResendBtn) {
+    otpResendBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        await fetch(`${BACKEND_URL}/auth/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: currentOtpEmail })
+        });
+        startOTPTimer();
+        alert('New code sent!');
+      } catch (err) {
+        alert('Failed to send new code');
+      }
+    });
+  }
+
+  if (backToSignupBtn) {
+    backToSignupBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      clearInterval(otpTimerInterval);
+      otpView.style.display = 'none';
+      authView.style.display = 'flex';
+      switchTab('signup');
+    });
+  }
+
+  // --- GUEST & SIGN OUT ---
   skipAuthBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    const session = { name: 'Guest', persistent: false };
-    chrome.storage.local.set({ session }, () => showMainView(session));
+    chrome.storage.local.set({ guestMode: true }, () => showMainView({ name: 'Guest' }));
   });
   
-  // Sign out
   userAvatar.addEventListener('click', () => {
-    chrome.storage.local.remove('session', () => {
+    chrome.storage.local.remove(['sessionToken', 'guestMode'], () => {
       showAuthView();
     });
   });
 
-  // --- Settings Logic ---
+  // --- SETTINGS LOGIC ---
   settingsBtn.addEventListener('click', () => {
     mainView.style.display = 'none';
     settingsView.style.display = 'flex';
-    
     chrome.storage.local.get(['showWidget', 'enableAutoTagging'], (res) => {
       widgetToggle.checked = res.showWidget !== false;
       taggingToggle.checked = res.enableAutoTagging !== false;
@@ -299,9 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   settingsBackBtn.addEventListener('click', () => {
-    chrome.storage.local.get(['session'], (res) => {
-      showMainView(res.session);
-    });
+    checkSession(); // Return to main view (or auth if session died)
   });
 
   widgetToggle.addEventListener('change', () => {
@@ -312,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.set({ enableAutoTagging: taggingToggle.checked });
   });
 
-  // --- Main Tray Logic ---
+  // --- MAIN TRAY LOGIC ---
   function render() {
     chrome.storage.local.get(['savedCapsules'], (result) => {
       capsules = result.savedCapsules || [];
@@ -428,7 +636,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Auto Tagging Logic
   function generateTags(turns, autoTaggingEnabled) {
     if (autoTaggingEnabled === false) return ['General'];
     const text = turns.map(t => t.content).join(' ').toLowerCase();
@@ -440,7 +647,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return tags.slice(0, 2);
   }
 
-  // Capture Button
   captureBtn.addEventListener('click', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab) return;
@@ -478,7 +684,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Global Actions
   window.deleteCapsule = (id) => {
     capsules = capsules.filter(c => c.id !== id);
     chrome.storage.local.set({ savedCapsules: capsules }, render);
@@ -490,7 +695,6 @@ document.addEventListener('DOMContentLoaded', () => {
     navigator.clipboard.writeText(text);
   };
 
-  // Previews
   function showPreview(c) {
     document.getElementById('modal-title').textContent = c.title;
     const content = document.getElementById('modal-content');
@@ -510,7 +714,6 @@ document.addEventListener('DOMContentLoaded', () => {
     modalDiff.classList.remove('active');
   });
 
-  // Drop Zones Logic
   const zones = document.querySelectorAll('.drop-zone');
   zones.forEach(zone => {
     zone.addEventListener('dragover', (e) => {

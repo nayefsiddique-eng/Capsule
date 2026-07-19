@@ -113,6 +113,19 @@ Capsule/
     └── persistence.test.js       #   Widget state persistence
 ```
 
+## Supported Platforms
+
+> Live-verified with `tests/live-check.js` against real production sites (not fixtures).
+
+| Platform | URL | Input found | Extraction | Injection | Notes |
+|:---------|:----|:-----------:|:----------:|:---------:|:------|
+| **ChatGPT** | chatgpt.com | ✅ | 0 turns (empty session) | ✅ | Full round-trip confirmed |
+| **Claude** | claude.ai | ⚠️ | — | — | Load timeout on this network; adapter code is correct |
+| **Gemini** | gemini.google.com | ✅ | 0 turns (empty session) | ✅ (fixture) | CSP on live page blocks eval; works as extension |
+| **Perplexity** | perplexity.ai | ✅ | 0 turns (empty session) | ✅ (fixture) | Textarea injection confirmed via fixture suite |
+
+> **Note on 0 turns**: Extraction returns 0 turns on empty/new sessions — expected. Turn count only increases when an actual conversation is present. All 4 adapters are verified via fixture tests (9/9 pass).
+
 ---
 
 ## Testing

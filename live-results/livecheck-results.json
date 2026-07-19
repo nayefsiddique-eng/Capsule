@@ -1,0 +1,45 @@
+[
+  {
+    "name": "ChatGPT",
+    "url": "https://chatgpt.com",
+    "turns": 0,
+    "inputFound": true,
+    "sendFound": false,
+    "injected": true,
+    "injectError": null,
+    "error": null,
+    "screenshot": "C:\\Users\\Admin pc\\Desktop\\Capsule\\live-results\\livecheck-chatgpt.png"
+  },
+  {
+    "name": "Claude",
+    "url": "https://claude.ai",
+    "turns": 0,
+    "inputFound": false,
+    "sendFound": false,
+    "injected": false,
+    "injectError": null,
+    "error": "page.goto: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://claude.ai/\", waiting until \"domcontentload"
+  },
+  {
+    "name": "Gemini",
+    "url": "https://gemini.google.com",
+    "turns": 0,
+    "inputFound": false,
+    "sendFound": false,
+    "injected": false,
+    "injectError": null,
+    "error": null,
+    "screenshot": "C:\\Users\\Admin pc\\Desktop\\Capsule\\live-results\\livecheck-gemini.png"
+  },
+  {
+    "name": "Perplexity",
+    "url": "https://www.perplexity.ai",
+    "turns": 0,
+    "inputFound": true,
+    "sendFound": false,
+    "injected": false,
+    "injectError": null,
+    "error": null,
+    "screenshot": "C:\\Users\\Admin pc\\Desktop\\Capsule\\live-results\\livecheck-perplexity.png"
+  }
+]
