@@ -10,7 +10,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.61.1"
+    "@playwright/test": "^1.61.1",
+    "jimp": "^1.6.1"
   },
   "dependencies": {
     "jsdom": "^29.1.1"

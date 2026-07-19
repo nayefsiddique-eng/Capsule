@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Capsule — AI Conversation Manager" width="680" />
+  <img src="assets/banner.jpg" alt="Capsule — AI Conversation Manager" width="450" />
 </p>
 
 <h1 align="center">Capsule</h1>

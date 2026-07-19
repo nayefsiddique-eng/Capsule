@@ -2,22 +2,23 @@
 node_modules/
 package-lock.json
 
-# Test artifacts
-test-results/
-test-fixtures/persistent-profile*/
-test-fixtures/qa-results/
-test-fixtures/live-results/
-
-# Temp debug scripts
-*.log
-test_output.txt
-test_results.txt
-
 # Backend
 backend/node_modules/
 backend/package-lock.json
 backend/.env
 backend/capsule.db
+backend/capsule.db-shm
+backend/capsule.db-wal
+
+# Test artifacts (generated outputs — not source)
+test-results/
+live-results/
+test-fixtures/persistent-profile*/
+
+# Temp / debug scripts
+*.log
+test_output.txt
+test_results.txt
 
 # OS files
 .DS_Store
