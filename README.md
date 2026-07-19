@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.jpg" alt="Capsule — AI Conversation Manager" width="450" />
+  <img src="assets/banner_cropped.jpg" alt="Capsule — AI Conversation Manager" width="450" />
 </p>
 
 <h1 align="center">Capsule</h1>
@@ -265,7 +265,7 @@ Capsule/
 │   └── .env.example              #   Environment variable template
 │
 ├── assets/
-│   ├── banner.jpg                #   README banner
+│   ├── banner_cropped.jpg        #   README banner
 │   ├── icon{16,48,128}.png       #   Extension icons
 │   └── fonts/                    #   Space Grotesk, JetBrains Mono
 │
